@@ -6,13 +6,24 @@
 //
 
 import SwiftUI
-import UIKit
 
 @available(iOS 13.0, *)
 @available(iOS 15.0, *)
 public extension View {
-    static func halfSheet<Content : View> (isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil, @ViewBuilder content: @escaping () -> Content) -> some View {
-        HalfSheetView(isPresented: isPresented, onDismiss: onDismiss, content: content)
+    func halfSheet<Content : View> (isPresented: Binding<Bool>, onDismiss: @escaping () -> Void, @ViewBuilder content: @escaping () -> Content) -> some View {
+        return self.overlay(
+            HalfSheet(isPresented: isPresented, onDismiss: onDismiss){
+                content()
+            }
+        )
+    }
+    
+    func halfSheet<Content : View> (isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> Content) -> some View {
+        return self.overlay(
+            HalfSheet(isPresented: isPresented){
+                content()
+            }
+        )
     }
 }
 
@@ -24,6 +35,18 @@ public struct HalfSheet<Content: View>: UIViewRepresentable {
     @Binding private var isPresented: Bool
     private let onDismiss: (() -> Void)?
     private let content: Content
+    
+    public init
+    (
+        isPresented: Binding<Bool>,
+        onDismiss: @escaping () -> Void,
+        @ViewBuilder content: @escaping () -> Content
+    )
+    {
+        self._isPresented = isPresented
+        self.onDismiss = onDismiss
+        self.content = content()
+    }
     
     public init
     (
@@ -117,41 +140,66 @@ public struct HalfSheet<Content: View>: UIViewRepresentable {
 // 2 - Create the SwiftUI modifier conforming to the ViewModifier protocol
 @available(iOS 13.0, *)
 @available(iOS 15.0, *)
-public struct HalfSheetView<Content : View>: View {
+public struct HalfSheetModifier<ContentView : View> : ViewModifier {
+    @Binding var isPresented: Bool
     
-    @Binding private var isPresented: Bool
+    var onDismiss: (() -> Void)?
     
-    private  let onDismiss: (() -> Void)?
-    
-    private let content: Content
+    var contentView: ContentView
     
     public init
     (
         isPresented: Binding<Bool>,
-        onDismiss: (() -> Void)? = nil,
-        @ViewBuilder content: @escaping () -> Content)
+        @ViewBuilder contentView: @escaping () -> ContentView)
+    {
+        self._isPresented = isPresented
+        self.contentView = contentView()
+    }
+    
+    public init
+    (
+        isPresented: Binding<Bool>,
+        onDismiss: @escaping () -> Void,
+        @ViewBuilder contentView: @escaping () -> ContentView)
     {
         self._isPresented = isPresented
         self.onDismiss = onDismiss
-        self.content = content()
+        self.contentView = contentView()
     }
     
-    public var body: some View {
-        self.content
+    public func body(content: Content) -> some View {
+        content
             .overlay(
-                HalfSheet(isPresented: $isPresented, onDismiss: onDismiss) {
-                    self.content
-                }
+                self.halfSheet
             )
     }
     
-//    public func body: some View {
-//        content
-//            .overlay(
-//                HalfSheet(isPresented: $isPresented, onDismiss: onDismiss) {
-//                    self.contentView
-//                }.fixedSize()
-//            )
-//    }
+    @ViewBuilder var halfSheet: some View {
+        if let onDismiss = onDismiss {
+            HalfSheet(isPresented: $isPresented, onDismiss: onDismiss) {
+                self.contentView
+            }.fixedSize()
+        } else {
+            HalfSheet(isPresented: $isPresented) {
+                self.contentView
+            }.fixedSize()
+        }
+    }
+}
+@available(iOS 13.0, *)
+@available(iOS 15.0, *)
+struct HalfSheet_Previews: PreviewProvider {
+    @State static var isActive: Bool = false
+    
+    static var previews: some View {
+        Button(action: {
+            self.isActive = true
+        }){
+            Text("Click me!")
+        }
+            .modifier(HalfSheetModifier(isPresented: $isActive){
+                Text("123")
+            })
+    }
 }
 
